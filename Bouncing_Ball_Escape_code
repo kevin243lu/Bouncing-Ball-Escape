@@ -1,4 +1,5 @@
 import pygame
+import numpy as np
 
 pygame.init()
 WIDTH = 800
@@ -8,13 +9,13 @@ clock = pygame.time.Clock()
 BLACK = (0, 0, 0)
 ORANGE = (255, 165, 0)
 RED = (255, 0, 0)
-CIRCLE_CENTER = [WIDTH / 2, HEIGHT / 2]
+CIRCLE_CENTER = np.array([WIDTH / 2, HEIGHT / 2], dtype=np.float64)
 CIRCLE_RADIUS = 150
 BALL_RADIUS = 5
-ball_position = [WIDTH / 2, HEIGHT / 2 - 120]
+ball_position = np.array([WIDTH / 2, HEIGHT / 2 - 120], dtype=np.float64)
 running = True
 GRAVITY = 0.3
-ball_velocity = [0, 0]
+ball_velocity = np.array([0, 0], dtype=np.float64)
 
 while running:
     for event in pygame.event.get():
@@ -23,6 +24,15 @@ while running:
     ball_velocity[1] += GRAVITY
     ball_position[0] += ball_velocity[0]
     ball_position[1] += ball_velocity[1]
+    distance = np.linalg.norm(ball_position - CIRCLE_CENTER)
+    if distance + BALL_RADIUS > CIRCLE_RADIUS:
+        d = ball_position - CIRCLE_CENTER
+        d_unit = d / np.linalg.norm(d)
+        ball_position = CIRCLE_CENTER + (CIRCLE_RADIUS - BALL_RADIUS) * d_unit
+        t = np.array([-d[1], d[0]], dtype=np.float64)
+        projection_v_t = (np.dot(ball_velocity, t)/np.dot(t, t)) * t
+        ball_velocity = 2 * projection_v_t - ball_velocity
+
 
     window.fill(BLACK)
     pygame.draw.circle(window, ORANGE, CIRCLE_CENTER, CIRCLE_RADIUS, 3)
