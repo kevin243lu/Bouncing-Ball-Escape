@@ -1,5 +1,30 @@
 import pygame
 import numpy as np
+import math
+import random
+
+class Ball:
+    def __init__(self, position, velocity):
+        self.position = np.array(position, dtype=np.float64)
+        self.velocity = np.array(velocity, dtype=np.float64)
+        self.color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        self.is_in = True
+
+def draw_arc(window, center, radius, start_angle, end_angle): # creates the hole in the circle, by making a triangle then coloring it black
+    p1 = center + (radius+1000) * np.array([math.cos(start_angle), math.sin(start_angle)])
+    p2 = center + (radius+1000) * np.array([math.cos(end_angle), math.sin(end_angle)])
+    pygame.draw.polygon(window, BLACK, [center, p1, p2], 0)
+
+def is_ball_in_arc(ball_position, CIRCLE_CENTER, start_angle, end_angle):
+    dx = ball_position[0] - CIRCLE_CENTER[0]
+    dy = ball_position[1] - CIRCLE_CENTER[1]
+    ball_angle = math.atan2(dy, dx)
+    start_angle = start_angle % (2 * math.pi) # keeps the start angle between 0 and 2 pi
+    end_angle = end_angle % (2 * math.pi) # keeps the end angle between 0 and 2 pi
+    if start_angle > end_angle:
+        end_angle += 2 * math.pi # makes sure the end angle is always larger than the starting angle
+    if start_angle <= ball_angle <= end_angle or (start_angle <= ball_angle + 2 * math.pi <= end_angle):
+        return True
 
 pygame.init()
 WIDTH = 800
@@ -15,29 +40,46 @@ BALL_RADIUS = 5
 ball_position = np.array([WIDTH / 2, HEIGHT / 2 - 120], dtype=np.float64)
 running = True
 GRAVITY = 0.3
+spinning_speed = 0.01
+arc_degree = 60 # part of triangle
+start_angle = math.radians(-arc_degree / 2) # part of triangle
+end_angle = math.radians(arc_degree / 2) # part of triangle 
 ball_velocity = np.array([0, 0], dtype=np.float64)
+balls = [Ball(ball_position, ball_velocity)]
 
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    ball_velocity[1] += GRAVITY
-    ball_position[0] += ball_velocity[0]
-    ball_position[1] += ball_velocity[1]
-    distance = np.linalg.norm(ball_position - CIRCLE_CENTER)
-    if distance + BALL_RADIUS > CIRCLE_RADIUS:
-        d = ball_position - CIRCLE_CENTER
-        d_unit = d / np.linalg.norm(d)
-        ball_position = CIRCLE_CENTER + (CIRCLE_RADIUS - BALL_RADIUS) * d_unit
-        t = np.array([-d[1], d[0]], dtype=np.float64)
-        projection_v_t = (np.dot(ball_velocity, t)/np.dot(t, t)) * t
-        ball_velocity = 2 * projection_v_t - ball_velocity
+    start_angle += spinning_speed
+    end_angle += spinning_speed
+    for ball in balls:
+        if ball.position[1] > HEIGHT or ball.position[0] < 0 or ball.position[0] > WIDTH or ball.position[1] < 0:
+            balls.remove(ball)
+            balls.append(Ball(position = [WIDTH // 2, HEIGHT // 2 - 120], velocity = [random.uniform(-4, 4), random.uniform(-1, 1)]))
+            balls.append(Ball(position = [WIDTH // 2, HEIGHT // 2 - 120], velocity = [random.uniform(-4, 4), random.uniform(-1, 1)]))
+
+        ball.velocity[1] += GRAVITY
+        ball.position += ball.velocity
+        distance = np.linalg.norm(ball.position - CIRCLE_CENTER)
+        if distance + BALL_RADIUS > CIRCLE_RADIUS:
+            if is_ball_in_arc(ball.position, CIRCLE_CENTER, start_angle, end_angle):
+                ball.is_in = False
+            if ball.is_in == True:
+                d = ball.position - CIRCLE_CENTER
+                d_unit = d / np.linalg.norm(d)
+                ball.position = CIRCLE_CENTER + (CIRCLE_RADIUS - BALL_RADIUS) * d_unit
+                t = np.array([-d[1], d[0]], dtype=np.float64)
+                projection_v_t = (np.dot(ball.velocity, t)/np.dot(t, t)) * t
+                ball.velocity = 2 * projection_v_t - ball.velocity
+                ball.velocity += t * spinning_speed # tangential force (v = w*r)
 
 
     window.fill(BLACK)
     pygame.draw.circle(window, ORANGE, CIRCLE_CENTER, CIRCLE_RADIUS, 3)
-    pygame.draw.circle(window, RED, ball_position, BALL_RADIUS)
-
+    draw_arc(window, CIRCLE_CENTER, CIRCLE_RADIUS, start_angle, end_angle)
+    for ball in balls:
+        pygame.draw.circle(window, ball.color, ball.position, BALL_RADIUS)
     pygame.display.flip()
     clock.tick(60)
 
